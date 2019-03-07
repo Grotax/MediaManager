@@ -1,0 +1,23 @@
+.media-container{
+    margin: 5px;
+    border-radius: 5px;
+    max-width: 330px;
+}
+.media-container img{
+    margin-top: 5px;
+    border-radius: 5px;
+}
+.detail-view{
+    max-width: 330px;
+    min-width: 220px;
+    margin-right: 5px;
+    border-radius: 5px;
+}
+.detail-view form{
+    margin-top: 5px;
+}
+.detail-view img{
+    
+    border-radius: 5px;
+}
+::-webkit-scrollbar { display: none; }

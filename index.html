@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Media Manager</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <link rel="stylesheet" href="node_modules/bootstrap/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-dark">
+    <!-- <navbar> -->
+        <nav role="navigation" class="navbar navbar-default navbar-static-top navbar-expand-lg">
+            <form class="mx-2 my-auto d-inline w-100">
+                <div class="input-group">
+                    <input type="text" class="form-control" placeholder="Search..." id="search">
+                    <div class="input-group-append" id="button-addon4">
+                        <button id="collectionBtn" class="btn btn-outline-secondary text-light" type="button">
+                            <div id="collectionSpinner" class="spinner-border spinner-border-sm text-light" hidden role="status">
+                                <span class="sr-only">Loading...</span>
+                            </div>
+                            Open Collection</button>
+                            <button id="rescanBtn" class="btn btn-outline-secondary text-light" type="button">
+                                <div id="rescanSpinner" class="spinner-border spinner-border-sm text-light" hidden role="status">
+                                    <span class="sr-only">Loading...</span>
+                                </div>
+                                Rescan</button>
+                            </div>
+                        </div>
+                    </form>
+                </nav>
+                
+                <!-- </navbar> -->
+                
+                <!-- <error> -->
+                    <div id="error-box" class="alert" hidden>
+                        <button id="error-button" type="button" class="close" data-dismiss="alert">x</button>
+                        <span id="error-message"></span>
+                    </div>
+                    <!-- </error> -->
+                    
+                    <div class="container-fluid">
+                        
+                        
+                        <div class="row">
+                            <div class="col"><!--justify-content-center-->
+                                <div class="row " id="media">
+                            
+                                    </div>
+                            </div>
+                            <div class="col-2 bg-secondary detail-view" id="detail-view" hidden>
+                                <button id="detail-view-closer" type="button" class="close text-light" data-dismiss="alert">x</button>
+                                <figure class="figure">
+                                    <img id="detail-image" src="" class="img-fluid">
+                                    <figcaption id="detail-date" class="text-light figure-caption">A caption for the above image.</figcaption>
+                                  </figure>
+                                <form>
+                                    <div class="form-group">
+                                        <input type="text" class="form-control" placeholder="Title" id="detail-title">
+                                        <input type="text" class="form-control" placeholder="Tags" id="detail-tags">
+                                        <input type="text" class="form-control" placeholder="FileName" id="detail-FileName">
+                                        <button id="saveMedium" class="btn btn-success text-light" type="button">Save</button>
+                                        <button id="detail-openMedium" class="btn btn-info text-light" type="button">Open</button>
+                                    </div>
+                                    <div class="form-group">
+                                       <!-- <button id="recreateMedium" class="btn btn-warning text-light" type="button">Recreate</button>-->
+                                        <button id="deleteMedium" class="btn btn-danger text-light" type="button">Delete</button>
+                                    </div>
+                                    
+                                </form>    
+                                
+                            </div>
+                            
+                        </div>
+                        
+                        
+                        
+                        
+                        
+                    </div>
+                    
+                    
+                    
+                    <script>
+                        const electron = require('electron');
+                        const {ipcRenderer, session, shell} = electron;
+                        const {dialog} = require('electron').remote;
+                        const search = document.getElementById("search")
+                        const path = require("path")
+                        const mediaContainer = document.getElementById("media")
+                        const errorBox = document.getElementById("error-box")
+                        const errorBtn = document.getElementById("error-button")
+                        const detailView = document.getElementById("detail-view")
+                        const detailViewCloser = document.getElementById("detail-view-closer")
+                        const errorMessage = document.getElementById("error-message")
+                        const collectionSpinner = document.getElementById("collectionSpinner")
+                        const rescanSpinner = document.getElementById("rescanSpinner")
+                        const detailImage = document.getElementById("detail-image")
+                        const detailTitle = document.getElementById("detail-title")
+                        const detailTags = document.getElementById("detail-tags")
+                        const detailFileName = document.getElementById("detail-FileName")
+                        detailDate = document.getElementById("detail-date")
+                        let collectionDir = null
+                        let currentMedium = null
+                        
+                        function loading(status) {
+                            if(status){
+                                collectionSpinner.hidden = false
+                                rescanSpinner.hidden = false
+                            }else{
+                                collectionSpinner.hidden = true
+                                rescanSpinner.hidden = true
+                            }
+                        }
+                        
+                        function displayError(error){
+                            console.log(error)
+                            switch(error.type) {
+                                case "warning":
+                                errorBox.classList.add("alert-warning")
+                                break;
+                                case "error":
+                                errorBox.classList.add("alert-danger")
+                                break;
+                                default:
+                                errorBox.classList.add("alert-info")
+                            }
+                            errorBox.hidden=false
+                            errorMessage.innerHTML=error.text
+                        }
+
+                        function editMedium(medium){
+                            currentMedium = medium
+                            detailView.hidden=false
+                            
+                            detailImage.setAttribute("src", medium.thumbnail)
+                            detailTitle.value = medium.title
+                            detailTags.value = medium.tags
+                            detailFileName.value = medium.filePath
+                            detailDate.innerHTML = new Date(medium.last_modified).toTimeString()
+                        }
+                        function storeMedium(medium){
+                            medium.title = detailTitle.value
+                            let tags = detailTags.value
+                            tags = tags.split(",")
+                            
+                            //TODO: more checks?
+                            cleanTags = tags.map(tag => tag.trim())
+                            
+                            medium.tags = cleanTags
+                            ipcRenderer.send("collection:update", medium)
+                        }
+
+                        function openMedium(medium){
+                            shell.openItem(medium.filePath)
+                        }
+
+                        function deleteMedium(medium){
+                        }
+                        
+                        errorBtn.addEventListener('click', function (event) {
+                            errorBox.hidden=true
+                            errorBox.classList.remove("alert-warning")
+                            errorBox.classList.remove("alert-danger")
+                            errorBox.classList.remove("alert-info")
+                        });
+
+                        detailViewCloser.addEventListener('click', function (event) {
+                            detailView.hidden=true
+                        });
+
+                        document.getElementById('detail-openMedium').addEventListener('click', function(event){
+                            openMedium(currentMedium)
+                        })
+                        document.getElementById('saveMedium').addEventListener('click', function(event){
+                            storeMedium(currentMedium)
+                        })
+                        
+                        document.getElementById('collectionBtn').addEventListener('click', function (event) {
+                            dialog.showOpenDialog({properties:['openDirectory']}, function (directory) {
+                                if (directory !== undefined) {
+                                    loading(true)
+                                    collectionDir = directory[0]
+                                    ipcRenderer.send("collection:create", directory)
+                                }
+                            });
+                        });
+                        
+                        document.getElementById('rescanBtn').addEventListener('click', function (event) {
+                            if(collectionDir !== null){
+                                loading(true)
+                                ipcRenderer.send("collection:rescan", collectionDir)
+                            }else{
+                                displayError({type:"info", text:"No collection"})
+                            }  
+                        });
+                        
+                        ipcRenderer.on("error:message", function(e, error){
+                            displayError(error)
+                        })
+                        
+                        class MediaCollection{
+                            deRenderMedium(medium){
+                                let element = document.getElementById(medium._id)
+                                element.parentNode.removeChild(element);
+                            }
+                            renderMedium(medium) {
+                                if (document.getElementById(medium._id)) {
+                                    return false
+                                }
+                                let div = document.createElement("div")
+                                let image = document.createElement("img");
+                                div.classList.add("col-12", "col-sm-6", "col-md-4", "col-lg-2", "col-xl-2")
+                                div.classList.add("media-container")
+                                div.classList.add("bg-secondary")
+                                div.classList.add("text-light")
+                                div.setAttribute("id", medium._id)
+                                div.addEventListener('click', function (event) {
+                                    editMedium(medium)
+                                })
+                                
+                                let imagePath = path.join(path.dirname(medium.filePath),".mediaManager","thumbnails",medium._id+".webp")
+                                
+                                //console.log(imagePath)
+                                image.setAttribute("src", imagePath);
+                                
+                                
+                                
+                                image.setAttribute("alt", medium.title);
+                                image.classList.add("img-fluid")
+                                div.appendChild(image)
+                                div.appendChild(document.createElement("br"))
+                                div.appendChild(document.createTextNode(medium.title))
+                                
+                                mediaContainer.appendChild(div)
+                                
+                                return true
+                            }   
+                            
+                        }
+                        const mediaCollection = new MediaCollection()
+                        
+                        let mediumCollection = null
+                        
+                        
+                        // TODO
+                        const form = document.querySelector('form');
+                        
+                        form.addEventListener('submit', e =>{
+                            e.preventDefault();
+                            /*while (mediaContainer.firstChild) {
+                                mediaContainer.removeChild(mediaContainer.firstChild);
+                            }*/
+                            console.log("Search for", search.value)
+                            ipcRenderer.send("search:request", search.value)
+                        });
+                        
+                        ipcRenderer.on('medium:add', function(e, medium){
+                            mediaCollection.renderMedium(medium)
+                        });
+                        
+                        ipcRenderer.on('media:add', function(e, media){
+                            media.forEach(medium => {
+                                mediaCollection.renderMedium(medium)
+                            });
+                            loading(false)
+                        });
+                        
+                        ipcRenderer.on('collection:rescan-done', function(e, media){
+                            while (mediaContainer.firstChild) {
+                                mediaContainer.removeChild(mediaContainer.firstChild);
+                            }
+                            media.forEach(medium => {
+                                mediaCollection.renderMedium(medium)
+                            });
+                            loading(false)
+                        });
+                        
+                        ipcRenderer.on('search:result', function(e, media){
+                            console.log("Search Result is here")
+                            while (mediaContainer.firstChild) {
+                                mediaContainer.removeChild(mediaContainer.firstChild);
+                            }
+                            media.forEach(medium => {
+                                mediaCollection.renderMedium(medium)
+                            });
+                        });
+                        
+                        ipcRenderer.send("mainWindowLoaded");
+                    </script>
+                </body>
+                </html>
